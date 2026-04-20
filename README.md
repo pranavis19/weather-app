@@ -183,4 +183,4 @@ This project is open source and free to use for personal and educational purpose
 ---
 
 ## Link
-Weather App[https://weather-app-project-git.netlify.app/]
+[Weather App](https://weather-app-project-git.netlify.app/)
