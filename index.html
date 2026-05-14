@@ -18,13 +18,21 @@
       transition: background 1.2s ease;
     }
 
-    /* ── Dynamic Backgrounds ──────────────────────────────────── */
-    body.bg-sunny    { background: linear-gradient(135deg, #f9c74f 0%, #f3722c 100%); }
-    body.bg-cloudy   { background: linear-gradient(135deg, #8fa3b1 0%, #c0c9d3 100%); }
-    body.bg-rainy    { background: linear-gradient(135deg, #2d3a4a 0%, #4a6078 100%); }
-    body.bg-snowy    { background: linear-gradient(135deg, #c9d6ff 0%, #e2e2e2 100%); }
-    body.bg-thunder  { background: linear-gradient(135deg, #1a1a2e 0%, #3a3a5c 100%); }
-    body.bg-night    { background: linear-gradient(135deg, #0f0c29 0%, #302b63 100%); }
+   /* ── Dynamic Backgrounds (Day) ───────────────────────────── */
+    body.bg-sunny-day    { background: linear-gradient(135deg, #ffd89b 0%, #f9c74f 50%, #f3722c 100%); }
+    body.bg-cloudy-day   { background: linear-gradient(135deg, #a8d5ff 0%, #8fa3b1 50%, #c0c9d3 100%); }
+    body.bg-rainy-day    { background: linear-gradient(135deg, #4a6078 0%, #5a7a98 50%, #3d5263 100%); }
+    body.bg-snowy-day    { background: linear-gradient(135deg, #e8f1ff 0%, #c9d6ff 50%, #e2e2e2 100%); }
+    body.bg-thunder-day  { background: linear-gradient(135deg, #5a4a7a 0%, #6a5a8a 50%, #4a3a6a 100%); }
+
+    /* ── Dynamic Backgrounds (Night) ──────────────────────────── */
+    body.bg-sunny-night   { background: linear-gradient(135deg, #1a1a4a 0%, #2a2a6a 50%, #1a1a3a 100%); }
+    body.bg-cloudy-night  { background: linear-gradient(135deg, #0f1a2e 0%, #1a2541 50%, #0f1530 100%); }
+    body.bg-rainy-night   { background: linear-gradient(135deg, #0a1428 0%, #1a2a48 50%, #0a0f20 100%); }
+    body.bg-snowy-night   { background: linear-gradient(135deg, #1a2a4a 0%, #2a3a5a 50%, #1a1f3a 100%); }
+    body.bg-thunder-night { background: linear-gradient(135deg, #0a0a1a 0%, #1a1a3a 50%, #000000 100%); }
+
+    /* ── Fallback ────────────────────────────────────────────── */
     body.bg-default  { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); }
 
     /* ── App Container ────────────────────────────────────────── */
@@ -356,34 +364,64 @@
 
     // ── Background mapping by weather type ───────────────────────
     const BG_CLASSES = {
-      sunny: 'bg-sunny', cloudy: 'bg-cloudy', rainy: 'bg-rainy',
-      snowy: 'bg-snowy', thunder: 'bg-thunder', night: 'bg-night', default: 'bg-default'
+      'sunny-day': 'bg-sunny-day', 'sunny-night': 'bg-sunny-night',
+      'cloudy-day': 'bg-cloudy-day', 'cloudy-night': 'bg-cloudy-night',
+      'rainy-day': 'bg-rainy-day', 'rainy-night': 'bg-rainy-night',
+      'snowy-day': 'bg-snowy-day', 'snowy-night': 'bg-snowy-night',
+      'thunder-day': 'bg-thunder-day', 'thunder-night': 'bg-thunder-night',
+      'default': 'bg-default'
     };
 
     /**
-     * Determine weather category from OWM condition ID + day/night flag.
+     * Determine if it's day or night based on:
+     * 1. OWM icon code (ends with 'd' for day, 'n' for night)
+     * 2. Local sunrise/sunset times from API
+     * Prefer the icon code as it's most reliable
+     */
+    function isNight(iconCode, current) {
+      // Check if icon explicitly indicates night
+      if (iconCode && iconCode.endsWith('n')) return true;
+      if (iconCode && iconCode.endsWith('d')) return false;
+      
+      // Fallback: check sunrise/sunset
+      if (current && current.sys) {
+        const now = Math.floor(Date.now() / 1000);
+        return now < current.sys.sunrise || now > current.sys.sunset;
+      }
+      
+      // Default fallback: check current hour (6am - 6pm = day)
+      const hour = new Date().getHours();
+      return hour < 6 || hour > 18;
+    }
+
+    /**
+     * Determine weather category from OWM condition ID.
      * OWM ID ranges: 2xx=thunder, 3xx=drizzle, 5xx=rain, 6xx=snow, 7xx=atmosphere, 800=clear, 80x=clouds
      */
-    function getWeatherCategory(id, isNight) {
-      if (isNight) return 'night';
-      if (id >= 200 && id < 300) return 'thunder';
-      if (id >= 300 && id < 600) return 'rainy';
-      if (id >= 600 && id < 700) return 'snowy';
-      if (id >= 700 && id < 800) return 'cloudy';
-      if (id === 800)            return 'sunny';
-      if (id > 800)              return 'cloudy';
-      return 'default';
+    function getWeatherCategory(id, isNightTime) {
+      let category = 'default';
+      
+      if (id >= 200 && id < 300)       category = 'thunder';
+      else if (id >= 300 && id < 600)  category = 'rainy';
+      else if (id >= 600 && id < 700)  category = 'snowy';
+      else if (id >= 700 && id < 800)  category = 'cloudy';
+      else if (id === 800)             category = 'sunny';
+      else if (id > 800)               category = 'cloudy';
+      
+      // Append day/night suffix
+      return isNightTime ? `${category}-night` : `${category}-day`;
     }
 
     /** Pick an emoji icon for the condition */
-    function getEmoji(id, isNight) {
+    /** Pick an emoji icon for the condition + day/night */
+    function getEmoji(id, isNightTime) {
       if (id >= 200 && id < 300) return '⛈️';
       if (id >= 300 && id < 400) return '🌦️';
       if (id >= 500 && id < 600) return '🌧️';
       if (id >= 600 && id < 700) return '❄️';
       if (id >= 700 && id < 800) return '🌫️';
-      if (id === 800)             return isNight ? '🌙' : '☀️';
-      if (id === 801 || id === 802) return '⛅';
+      if (id === 800)             return isNightTime ? '🌙' : '☀️';
+      if (id === 801 || id === 802) return isNightTime ? '🌤️' : '⛅';
       if (id > 802)               return '☁️';
       return '🌡️';
     }
@@ -438,10 +476,13 @@
     // ── Render main weather data ─────────────────────────────────
     function renderWeather(current, forecast) {
       const id      = current.weather[0].id;
-      const isNight = current.weather[0].icon.endsWith('n');
-      const cat     = getWeatherCategory(id, isNight);
+      const icon    = current.weather[0].icon;
+      const isNightTime = isNight(icon, current);
+      const cat     = getWeatherCategory(id, isNightTime);
 
-      setBackground(cat);
+      // Get the background class key (e.g., 'sunny-day' or 'rainy-night')
+      const bgClass = BG_CLASSES[cat] || BG_CLASSES.default;
+      setBackground(bgClass);
 
       // Current card
       document.getElementById('city-name').textContent =
@@ -451,7 +492,7 @@
       document.getElementById('condition').textContent   = current.weather[0].description;
       document.getElementById('feels-like').textContent  =
         `Feels like ${tempStr(current.main.feels_like)}`;
-      document.getElementById('weather-icon').textContent = getEmoji(id, isNight);
+      document.getElementById('weather-icon').textContent = getEmoji(id, isNightTime);
       document.getElementById('humidity').textContent    = current.main.humidity;
       document.getElementById('wind-speed').textContent  = windVal(current.wind.speed);
       document.getElementById('wind-unit').textContent   = unit === 'C' ? 'km/h' : 'mph';
